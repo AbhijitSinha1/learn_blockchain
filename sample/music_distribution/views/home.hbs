@@ -1,0 +1,166 @@
+<script src="/static/js/jquery.min.js"></script>
+<script src="/static/js/axios.min.js"></script>
+<script src="/static/js/custom.js"></script>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+
+<div class="row">
+  <div class="col-sm-6">
+    <div>
+      <button name="fetch-accounts" class="btn btn-primary">Fetch</button>
+      <select name="select-accounts">
+        <option>Accounts</option>
+      </select>
+    </div>
+    <hr>
+    <div>
+      <label>Create File section</label>
+      <ul>
+        <li><label>Account: </label> <label name="selected-account"></label></li>
+        <li><label>Name: </label> <input name="file-name" /></li>
+        <li><label>Download Price: </label> <input name="download-price"/></li>
+        <li><label>Open Price: </label> <input name="open-price"/></li>
+      </ul>
+      <button name="create-file" class="btn btn-success">Create File</button>
+    </div>
+    <hr>
+    <div>
+      <label>Download File Section</label>
+      <ul>
+        <li><label>From Account: </label> <label name="selected-account"></label></li>
+        <li><label>File: </label><select name="select-files"><option>
+          File
+        </option></select></li>
+        <li class="row">
+          <button class="btn btn-primary col-sm-6" name="file-download">Download</button>
+          <button class="btn btn-success col-sm-6" name="file-open">Open</button>
+        </li>
+      </ul>
+    </div>
+  </div>
+  <div class="col-sm-6">
+    <label>Balance Section</label>
+    <ul name="account-balance">
+    </ul>
+  </div>
+</div>
+
+<script>
+
+  var fetchAccountButton = Z.name("fetch-accounts");
+  var createFileButton = Z.name("create-file");
+  var accountSelect = Z.name("select-accounts");
+  var fileSelect = Z.name("select-files");
+  var labels = Z.nameAll("selected-account");
+
+  var fileDownloadButton = Z.name("file-download");
+  var fileOpenButton = Z.name("file-open");
+
+  var selectedAccount;
+  var selectedFile;
+  var allAccounts = [];
+  var accountBalance = {};
+  var files = {}
+
+  fetchAccountButton.addEventListener('click', function() {
+    MT.fetchAccounts(function(error, accounts) {
+      if (error) {
+        console.error(error);
+      } else {
+        allAccounts = Object.assign([], accounts);
+        accountSelect.innerHTML = accounts.map((acc, index) => "<option value='"+acc+"'>Account-" + index + "</option>").reduce((a, b) => a + b);
+        selectedAccount = accounts[0];
+        updateSelectedAccountLabel()
+        updateAllAccountBalance();
+      }
+    });
+  });
+
+  createFileButton.addEventListener('click', function() {
+    var account = selectedAccount;
+    var fileName = Z.name("file-name").value;
+    var downloadPrice = Z.name("download-price").value;
+    var openPrice = Z.name("open-price").value;
+
+    MT.createFile(account, fileName, downloadPrice, openPrice, function(error, response) {
+      var file = Object.assign({}, response);
+      files[file.fileId] = file;
+      updateAccountBalance(account);
+      updateFileList();
+    });
+  });
+
+  accountSelect.addEventListener('change', function() {
+    selectedAccount = accountSelect.value;
+    updateSelectedAccountLabel();
+    updateAccountBalanceList();
+  });
+
+  fileSelect.addEventListener('change', function() {
+    selectedFile = files[fileSelect.value];
+  });
+
+  fileDownloadButton.addEventListener('click', function() {
+    MT.downloadFile(selectedAccount, selectedFile.fileId, selectedFile.downloadPrice, function(error, response) {
+      if(!error) {
+        updateAllAccountBalance();
+      } else {
+        console.error(error);
+      }
+    });
+  });
+
+  fileOpenButton.addEventListener('click', function() {
+    MT.openFile(selectedAccount, selectedFile.fileId, selectedFile.openPrice, function(error, response) {
+      if(!error) {
+        updateAllAccountBalance();
+      } else {
+        console.error(error);
+      }
+    });
+  });
+
+  function updateFileList() {
+    Z.nameAll("select-files").forEach(function(select) {
+      select.innerHTML = Object.keys(files).map(id => {
+        return "<option value='"+id+"'>"+files[id].fileName+"</option>"
+      }).reduce((a, b) => a + b);
+    });
+  }
+
+  function updateAllAccountBalance() {
+    allAccounts.forEach(acc => {
+      updateAccountBalance(acc);
+    });
+  }
+
+  function updateAccountBalance(acc) {
+    MT.fetchBalance(acc, function(err, res) {
+      if(!err) {
+        var o = {}
+        o[acc] = res
+        accountBalance = Object.assign(accountBalance, o);
+      } else {
+        var o = {}
+        o[acc] = "Could not fetch Blance!"
+        accountBalance = Object.assign(accountBalance, o);
+      }
+      updateAccountBalanceList();
+    });
+  }
+
+  function updateAccountBalanceList() {
+    var balance = Object.keys(accountBalance).map(key => {
+      var selected = selectedAccount === key;
+      return "<li class='col-sm-12' style='"+(selected ? "border: 1px solid grey" : "")+"'><span class='col-sm-3'>"+key+"</span><span class='col-sm-3'>"+accountBalance[key]+"</span></li>"
+    }).reduce((a, b) => a + b);
+    Z.name("account-balance").innerHTML = balance;
+  }
+
+  function updateSelectedAccountLabel() {
+    labels.forEach(function(label) {
+      label.innerHTML = selectedAccount
+    });
+  }
+
+</script>
